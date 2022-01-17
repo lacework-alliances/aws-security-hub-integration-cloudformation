@@ -114,8 +114,6 @@ func create(ctx context.Context, event cfn.Event) (physicalResourceID string, da
 	alertChannelName := os.Getenv("alert_channel_name")
 	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"create started",subAccountName,"{}")
 
-	cfnResponse := cfn.NewResponse(&event)
-
 	valid := true
 
 	if laceworkUrl == "" {
@@ -143,9 +141,6 @@ func create(ctx context.Context, event cfn.Event) (physicalResourceID string, da
 	}
 
 	if !valid {
-		cfnResponse.Status = cfn.StatusFailed
-		cfnResponse.Reason = "Required environment variables were not set."
-		cfnResponse.Send()
 		return event.PhysicalResourceID,nil,errors.New("unable to run setup due to missing required environment variables")
 	}
 
@@ -155,33 +150,18 @@ func create(ctx context.Context, event cfn.Event) (physicalResourceID string, da
 		if intgGuid, err := sendPostAlertChannelRequest(alertChannelName,eventBusArn,laceworkUrl,*accessToken,subAccountName); err == nil {
 			LogI.Println("Creating Alert Rule.")
 			if err := sendPostAlertRuleRequest(alertChannelName,*intgGuid,laceworkUrl,*accessToken,subAccountName); err != nil {
-				errMsg := fmt.Sprintf("Failed creating alert rule: %v",err)
-				LogE.Println(errMsg)
-				cfnResponse.Status = cfn.StatusFailed
-				cfnResponse.Reason = errMsg
-				cfnResponse.Send()
 				return event.PhysicalResourceID,nil,err
 			}
 		} else {
 			errMsg := fmt.Sprintf("Failed creating alert channel: %v",err)
 			LogE.Println(errMsg)
-			cfnResponse.Status = cfn.StatusFailed
-			cfnResponse.Reason = errMsg
-			cfnResponse.Send()
 			return event.PhysicalResourceID,nil,err
 		}
 	} else {
-		errMsg := fmt.Sprintf("Failed creating access token: %v",err)
-		LogE.Println(errMsg)
-		cfnResponse.Status = cfn.StatusFailed
-		cfnResponse.Reason = errMsg
-		cfnResponse.Send()
 		return event.PhysicalResourceID,nil,err
 	}
 
 	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"create completed",subAccountName,"{}")
-	cfnResponse.Status = cfn.StatusSuccess
-	cfnResponse.Send()
 	return event.PhysicalResourceID,nil,nil
 }
 
@@ -191,13 +171,11 @@ func delete(ctx context.Context, event cfn.Event) (physicalResourceID string, da
 	subAccountName := os.Getenv("lacework_sub_account_name")
 	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"delete started",subAccountName,"{}")
 
-	cfnResponse := cfn.NewResponse(&event)
 	/**
 	TODO: Delete alert channel, delete alert rule
 	 */
 	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"delete completed",subAccountName,"{}")
-	cfnResponse.Status = cfn.StatusSuccess
-	cfnResponse.Send()
+
 	return event.PhysicalResourceID,nil,nil
 }
 
@@ -228,8 +206,7 @@ func sendPostAccessTokenRequest(laceworkUrl string, accessKeyId string, secretKe
 			if resp.StatusCode == http.StatusCreated {
 				return &respData.Token, nil
 			} else {
-				LogE.Printf("Failed to get access token %d",resp.StatusCode)
-				return nil,errors.New(string(resp.StatusCode))
+				return nil,errors.New(fmt.Sprintf("Failed to get access token. Response status is %d",resp.StatusCode))
 			}
 		} else {
 			return nil, err
@@ -266,7 +243,7 @@ func sendPostAlertChannelRequest(name string, eventBusArn string, laceworkUrl st
 					return nil, err
 				}
 			} else {
-				return nil,errors.New(fmt.Sprintf("Response status is %d",resp.StatusCode))
+				return nil,errors.New(fmt.Sprintf("Failed sending alert channel request. Response status is %d",resp.StatusCode))
 			}
 
 		} else {
@@ -301,7 +278,7 @@ func sendPostAlertRuleRequest(name string,intgGuid string, laceworkUrl string, a
 				LogI.Printf("Received response: %s", string(respDump))
 				return nil
 			} else {
-				return errors.New(fmt.Sprintf("Response status is %d",resp.StatusCode))
+				return errors.New(fmt.Sprintf("Failed sending alert rule request. Response status is %d",resp.StatusCode))
 			}
 		} else {
 			return err
@@ -356,9 +333,9 @@ func sendHoneycombEvent(account string, event string, subAccountName string, eve
 			request.Header.Add("X-Honeycomb-Team", "$HONEY_KEY")
 			request.Header.Add("content-type", "application/json")
 			if resp, err := http.DefaultClient.Do(request); err == nil {
-				LogI.Println("Set event to Honeycomb: ", event, resp.StatusCode)
+				LogI.Printf("Set event to Honeycomb: %s %d", event, resp.StatusCode)
 			} else {
-				LogW.Println("Unable to send event to Honeycomb: ", err)
+				LogW.Printf("Unable to send event to Honeycomb: %s", err)
 			}
 		}
 	}
