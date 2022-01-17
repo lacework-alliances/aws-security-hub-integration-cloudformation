@@ -1,0 +1,300 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "Lacework AWS Control Tower Integration: Add the Lacework Cloud Security Platform for cloud-native threat detection, compliance, behavioral anomaly detection, and automated AWS security monitoring."
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Basic Configuration"
+        Parameters:
+          - LaceworkURL
+          - LaceworkSubAccountName
+          - LaceworkAccessKeyID
+          - LaceworkSecretKey
+          - CreateAlertChannelRules
+          - AlertChannelName
+      - Label:
+          default: "Advanced Configuration"
+        Parameters:
+          - S3BucketName
+          - S3KeyPrefix
+    ParameterLabels:
+      LaceworkURL:
+        default: Your Lacework URL
+      LaceworkSubAccountName:
+        default: Lacework Sub-Account Name
+      LaceworkAccessKeyID:
+        default: Lacework Access Key ID
+      LaceworkSecretKey:
+        default: Lacework Secret Key
+      CreateAlertChannelRules:
+        default: Create Lacework Alert Channel
+      AlertChannelName:
+        default: Alert Channel Name
+      S3BucketName:
+        default: Cloudformation S3 Bucket
+      S3KeyPrefix:
+        default: Cloudformation S3 Key Prefix
+Parameters:
+  # basic
+  LaceworkURL:
+    Type: String
+    Description: "Enter your Lacework URL. ie. account.lacework.net."
+    MinLength: '1'
+    AllowedPattern: '(.+?)\.lacework\.net'
+    ConstraintDescription: "Invalid Lacework URL."
+  LaceworkSubAccountName:
+    Type: String
+    Description: "If Lacework Organizations is enabled, enter the sub-account. Leave blank if Lacework Organizations is not enabled."
+    AllowedPattern: '^$|^[a-zA-Z0-9.]+(?:-[a-zA-Z0-9.]+)*$'
+    ConstraintDescription: "Invalid Lacework account name entered. The account name may contain alphanumeric characters and dashes only."
+  LaceworkAccessKeyID:
+    Type: String
+    MinLength: '1'
+    AllowedPattern: '^[-a-zA-Z0-9_]*$'
+    ConstraintDescription: "The Lacework API Access Key ID contains alphanumeric characters and symbols only."
+    Description: "Enter the Lacework API Secret Key ID. See https://support.lacework.com/hc/en-us/articles/360011403853-Generate-API-Access-Keys-and-Tokens."
+  LaceworkSecretKey:
+    Type: String
+    NoEcho: true
+    MinLength: '1'
+    AllowedPattern: '^[a-zA-Z0-9_]*$'
+    ConstraintDescription: "The Lacework API Secret Key contains alphanumeric characters and symbols only."
+    Description: "Enter the Lacework API Secret Key. See https://support.lacework.com/hc/en-us/articles/360011403853-Generate-API-Access-Keys-and-Tokens."
+  CreateAlertChannelRules:
+    Type: String
+    AllowedValues:
+      - "Yes"
+      - "No"
+    Default: "Yes"
+    Description: "Choose 'Yes' if you would like the Lacework Alert Channel and Rules automatically created for you. This Alert Channel and Rules will send its events to AWS Security Hub. Otherwise, you can create the Alert Channel and Rules manually."
+  AlertChannelName:
+    Type: String
+    Description: "If choosing to create a Lacework Alert Channel, specify the name."
+    AllowedPattern: '^$|^[a-zA-Z0-9.]+(?:-[a-zA-Z0-9.]+)*$'
+    ConstraintDescription: "Invalid Lacework Alert Channel name entered. The account name may contain alphanumeric characters and dashes only."
+    Default: "Lacework-AWS-Security-Hub"
+  # advanced
+  S3BucketName:
+    Type: String
+    Default: lacework-alliances
+    MinLength: '1'
+    Description: "Enter the S3 bucket for Lacework Security Hub CloudFormation assets. Use this if you want to customize your deployment."
+  S3KeyPrefix:
+    Type: String
+    Default: lacework-aws-security-hub
+    MinLength: '1'
+    Description: "Enter the S3 key prefix for Lacework Security Hub Cloudformation assets directory. Use this if you want to customize your deployment."
+Conditions:
+  CreateNewAlertChannelRules: !Equals
+    - !Ref CreateAlertChannelRules
+    - 'Yes'
+Resources:
+  LambdaZipsBucket:
+    Type: AWS::S3::Bucket
+
+  CopyZips:
+    Type: Custom::CopyZips
+    Properties:
+      ServiceToken: !GetAtt 'CopyZipsFunction.Arn'
+      DestBucket: !Ref 'LambdaZipsBucket'
+      SourceBucket: !Ref 'S3BucketName'
+      Prefix: !Ref 'S3KeyPrefix'
+      Objects:
+        - '/lambda/function.zip'
+        - '/lambda/setup.zip'
+
+  CopyZipsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Path: /
+      Policies:
+        - PolicyName: lambda-copier
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectTagging
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${S3BucketName}/${S3KeyPrefix}*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:PutObjectTagging
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${LambdaZipsBucket}/${S3KeyPrefix}*'
+
+  CopyZipsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Copies objects from the S3 bucket to a new location.
+      Handler: index.handler
+      Runtime: python3.7
+      Role: !GetAtt 'CopyZipsRole.Arn'
+      Timeout: 240
+      Code:
+        ZipFile: |
+          import json
+          import logging
+          import threading
+          import boto3
+          import cfnresponse
+          def copy_objects(source_bucket, dest_bucket, prefix, objects):
+              s3 = boto3.client('s3')
+              for o in objects:
+                  key = prefix + o
+                  copy_source = {
+                      'Bucket': source_bucket,
+                      'Key': key
+                  }
+                  print('copy_source: %s' % copy_source)
+                  print('dest_bucket = %s'%dest_bucket)
+                  print('key = %s' %key)
+                  s3.copy_object(CopySource=copy_source, Bucket=dest_bucket,
+                        Key=key)
+          def delete_objects(bucket, prefix, objects):
+              s3 = boto3.client('s3')
+              objects = {'Objects': [{'Key': prefix + o} for o in objects]}
+              s3.delete_objects(Bucket=bucket, Delete=objects)
+          def timeout(event, context):
+              logging.error('Execution is about to time out, sending failure response to CloudFormation')
+              cfnresponse.send(event, context, cfnresponse.FAILED, {}, None)
+          def handler(event, context):
+              # make sure we send a failure to CloudFormation if the function
+              # is going to timeout
+              timer = threading.Timer((context.get_remaining_time_in_millis()
+                        / 1000.00) - 0.5, timeout, args=[event, context])
+              timer.start()
+              print('Received event: %s' % json.dumps(event))
+              status = cfnresponse.SUCCESS
+              try:
+                  source_bucket = event['ResourceProperties']['SourceBucket']
+                  dest_bucket = event['ResourceProperties']['DestBucket']
+                  prefix = event['ResourceProperties']['Prefix']
+                  objects = event['ResourceProperties']['Objects']
+                  if event['RequestType'] == 'Delete':
+                      delete_objects(dest_bucket, prefix, objects)
+                  else:
+                      copy_objects(source_bucket, dest_bucket, prefix, objects)
+              except Exception as e:
+                  logging.error('Exception: %s' % e, exc_info=True)
+                  status = cfnresponse.FAILED
+              finally:
+                  timer.cancel()
+                  cfnresponse.send(event, context, status, {}, None)
+
+  LaceworkSecurityHubSetupFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: CopyZips
+    Properties:
+      Code:
+        S3Bucket: !Ref LambdaZipsBucket
+        S3Key: !Join ['', [!Ref 'S3KeyPrefix', '/lambda/setup.zip']]
+      Handler: main
+      Runtime: go1.x
+      Environment:
+        Variables:
+          lacework_url: !Ref LaceworkURL
+          lacework_sub_account_name: !Ref LaceworkSubAccountName
+          lacework_access_key_id: !Ref LaceworkAccessKeyID
+          lacework_secret_key: !Ref LaceworkSecretKey
+          event_bus_arn: !GetAtt LaceworkSecurityHubEventBus.Arn
+          alert_channel_name: !Ref AlertChannelName
+      Role: !GetAtt LaceworkSecurityHubSetupFunctionRole.Arn
+
+  LaceworkSecurityHubSetupFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  LaceworkSecurityHubSetup: # this will launch the setup function. appropriate methods are called via crhelper in the function.
+    Condition: CreateNewAlertChannelRules
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken:
+        !GetAtt LaceworkSecurityHubSetupFunction.Arn
+
+  LaceworkSecurityHubEventFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  LaceworkSecurityHubEventFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: CopyZips
+    Properties:
+      Code:
+        S3Bucket: !Ref LambdaZipsBucket
+        S3Key: !Join ['', [!Ref 'S3KeyPrefix', '/lambda/function.zip']]
+      Handler: main
+      MemorySize: 128
+      Runtime: go1.x
+      Role: !GetAtt LaceworkSecurityHubEventFunctionRole.Arn
+
+  LaceworkSecurityHubEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: "LaceworkSecurityHubEventBus"
+
+  LaceworkSecurityHubEventBusPolicy:
+    Type: AWS::Events::EventBusPolicy
+    Properties:
+      EventBusName: !Ref LaceworkSecurityHubEventBus
+      StatementId: "LaceworkSecurityHubEventBusStatement"
+      Statement:
+        Effect: "Allow"
+        Principal:
+          AWS: "arn:aws:iam::434813966438:root"
+        Action: "events:PutEvents"
+        Resource: !GetAtt LaceworkSecurityHubEventBus.Arn
+
+  LaceworkSecurityEvents:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: "Captures Lacework Security Events"
+      EventBusName: !GetAtt LaceworkSecurityHubEventBus.Name
+      EventPattern:
+        source:
+          - "434813966438"
+      Name: LaceworkEventsRule
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LaceworkSecurityHubEventFunction.Arn
+          Id: IDLaceworkSecurityHubEventFunction
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt "LaceworkSecurityHubEventFunction.Arn"
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt "LaceworkSecurityEvents.Arn"
