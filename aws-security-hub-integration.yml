@@ -245,6 +245,17 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Path: /
+      Policies:
+        - PolicyName: AWS_Security_Hub_Operations
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: SecHubImport
+                Effect: Allow
+                Action:
+                  - securityhub:BatchImportFindings
+                Resource:
+                  - "*" #security hub product arn - needs update
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 
@@ -283,7 +294,7 @@ Resources:
       Description: "Captures Lacework Security Events"
       EventBusName: !GetAtt LaceworkSecurityHubEventBus.Name
       EventPattern:
-        source:
+        account:
           - "434813966438"
       Name: LaceworkEventsRule
       State: ENABLED
