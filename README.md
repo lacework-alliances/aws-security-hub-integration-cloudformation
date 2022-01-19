@@ -22,19 +22,20 @@ You need the following prerequisites to implement the Lacework AWS Security Hub 
 ### 2. Deploy the Lacework AWS Security Hub Integration with CloudFormation
 1. Login in to AWS master account with Administrator permissions.
 Click on the following Launch Stack button to go to your CloudFormation console and launch the AWS Control Integration template.
-   [![Launch Stack](https://dmhnzl5mp9mj6.cloudfront.net/application-management_awsblog/images/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home?#/stacks/create/review?templateURL=https://lacework-alliances.s3.us-west-2.amazonaws.com/lacework-aws-security-hub/templates/aws-security-hub-integration.yml)
+   
+   [![Launch Stack](https://user-images.githubusercontent.com/6440106/150169828-1692c426-ce7a-4ee9-ae6e-0a0b2d9a99e8.png)](https://console.aws.amazon.com/cloudformation/home?#/stacks/create/review?templateURL=https://lacework-alliances.s3.us-west-2.amazonaws.com/lacework-aws-security-hub/templates/aws-security-hub-integration.yml)
 
    For most deployments, you only need the Basic Configuration parameters. Use the Advanced Configuration for customization.
    ![CloudFormation Stack Form](https://user-images.githubusercontent.com/6440106/149715371-62f7f918-ac94-4c6e-8c9d-a8049eda6f9b.png)
-2. Specify the following Basic Configuration parameters:
+3. Specify the following Basic Configuration parameters:
     * Enter a **Stack name** for the stack.
     * Enter **Your Lacework URL**.
     * Enter your **Lacework Sub-Account Name** if you are using Lacework Organizations.
     * Enter your **Lacework Access Key ID** and **Secret Key** that you copied from your previous API Keys file.
     * Choose whether you want to **Create Lacework Alert Channel**. This will create the Lacework alert channel and rule.
     * Enter the **Alert Channel Name**.
-3. Click **Next** through to your stack **Review**.
-4. Accept the AWS CloudFormation terms and click **Create stack**.
+4. Click **Next** through to your stack **Review**.
+5. Accept the AWS CloudFormation terms and click **Create stack**.
 
 ### 3. CloudFormation Progress
 
