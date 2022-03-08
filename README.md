@@ -32,6 +32,8 @@ Click on the following Launch Stack button to go to your CloudFormation console 
     * Enter **Your Lacework URL**.
     * Enter your **Lacework Sub-Account Name** if you are using Lacework Organizations.
     * Enter your **Lacework Access Key ID** and **Secret Key** that you copied from your previous API Keys file.
+    * Enter a **Resource Prefix Name** for the AWS resources that will be created.
+    * For **Customer Accounts**, enter a comma-separated list of AWS Accounts IDs that are monitored by Lacework.
     * Choose whether you want to **Create Lacework Alert Channel**. This will create the Lacework alert channel and rule.
     * Enter the **Alert Channel Name**.
 4. Click **Next** through to your stack **Review**.
