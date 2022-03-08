@@ -10,6 +10,8 @@ Metadata:
           - LaceworkSubAccountName
           - LaceworkAccessKeyID
           - LaceworkSecretKey
+          - ResourcePrefixName
+          - CustomerAccounts
           - CreateAlertChannelRules
           - AlertChannelName
       - Label:
@@ -26,6 +28,10 @@ Metadata:
         default: Lacework Access Key ID
       LaceworkSecretKey:
         default: Lacework Secret Key
+      ResourcePrefixName:
+        default: Resource Prefix Name
+      CustomerAccounts:
+        default: Customer Accounts
       CreateAlertChannelRules:
         default: Create Lacework Alert Channel
       AlertChannelName:
@@ -60,6 +66,17 @@ Parameters:
     AllowedPattern: '^[a-zA-Z0-9_]*$'
     ConstraintDescription: "The Lacework API Secret Key contains alphanumeric characters and symbols only."
     Description: "Enter the Lacework API Secret Key. See https://support.lacework.com/hc/en-us/articles/360011403853-Generate-API-Access-Keys-and-Tokens."
+  ResourcePrefixName:
+    Type: String
+    Description: "Specify the prefix to use for all resources that are created: EventBridge event bus, event rule, SQS queue, alert channel and rule."
+    AllowedPattern: '^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$'
+    ConstraintDescription: "Resource prefix name may contain alphanumeric characters and dashes only."
+    Default: "Lacework-AWS-Security-Hub"
+  CustomerAccounts:
+    Type: String
+    Description: "Specify the comma-separated list of AWS Account IDs for which Lacework is monitoring."
+    AllowedPattern: '^$|^[0-9,]+(?:-[0-9,]+)*$'
+    ConstraintDescription: "Invalid list entered. AWS Account IDs are numeric only."
   CreateAlertChannelRules:
     Type: String
     AllowedValues:
@@ -69,9 +86,9 @@ Parameters:
     Description: "Choose 'Yes' if you would like the Lacework Alert Channel and Rules automatically created for you. This Alert Channel and Rules will send its events to AWS Security Hub. Otherwise, you can create the Alert Channel and Rules manually."
   AlertChannelName:
     Type: String
-    Description: "If choosing to create a Lacework Alert Channel, specify the name."
-    AllowedPattern: '^$|^[a-zA-Z0-9.]+(?:-[a-zA-Z0-9.]+)*$'
-    ConstraintDescription: "Invalid Lacework Alert Channel name entered. The account name may contain alphanumeric characters and dashes only."
+    Description: "Specify the name of the alert channel in Lacework."
+    AllowedPattern: '^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$'
+    ConstraintDescription: "Alert channel name may contain alphanumeric characters and dashes only."
     Default: "Lacework-AWS-Security-Hub"
   # advanced
   S3BucketName:
@@ -255,26 +272,33 @@ Resources:
                 Action:
                   - securityhub:BatchImportFindings
                 Resource:
-                  - "*" #security hub product arn - needs update
+                  - !Sub "arn:aws:securityhub:${AWS::Region}::product/lacework/lacework"
       ManagedPolicyArns:
-        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole'
 
   LaceworkSecurityHubEventFunction:
     Type: AWS::Lambda::Function
-    DependsOn: CopyZips
+    DependsOn:
+    - CopyZips
+    - LaceworkSecurityHubQueue
     Properties:
       Code:
         S3Bucket: !Ref LambdaZipsBucket
         S3Key: !Join ['', [!Ref 'S3KeyPrefix', '/lambda/function.zip']]
       Handler: main
-      MemorySize: 128
+      MemorySize: 256
+      Timeout: 30
       Runtime: go1.x
+      Environment:
+        Variables:
+          DEFAULT_AWS_ACCOUNT: !Ref AWS::AccountId
+          LACEWORK_INSTANCE: !Ref LaceworkURL
       Role: !GetAtt LaceworkSecurityHubEventFunctionRole.Arn
 
   LaceworkSecurityHubEventBus:
     Type: AWS::Events::EventBus
     Properties:
-      Name: "LaceworkSecurityHubEventBus"
+      Name: !Join ['', [!Ref ResourcePrefixName, '-Event-Bus']]
 
   LaceworkSecurityHubEventBusPolicy:
     Type: AWS::Events::EventBusPolicy
@@ -288,24 +312,28 @@ Resources:
         Action: "events:PutEvents"
         Resource: !GetAtt LaceworkSecurityHubEventBus.Arn
 
-  LaceworkSecurityEvents:
+  LaceworkSecurityHubEvents:
     Type: 'AWS::Events::Rule'
     Properties:
       Description: "Captures Lacework Security Events"
       EventBusName: !GetAtt LaceworkSecurityHubEventBus.Name
       EventPattern:
-        account:
-          - "434813966438"
-      Name: LaceworkEventsRule
+        account: !Split [",", !Join [",", [!Ref CustomerAccounts, !Ref AWS::AccountId]]]
+      Name: !Join ['', [!Ref ResourcePrefixName, '-Event-Rule']]
       State: ENABLED
       Targets:
-        - Arn: !GetAtt LaceworkSecurityHubEventFunction.Arn
-          Id: IDLaceworkSecurityHubEventFunction
+        - Arn: !GetAtt LaceworkSecurityHubQueue.Arn
+          Id: lacework-security-hub-event-to-sqs-queue
 
-  PermissionForEventsToInvokeLambda:
-    Type: AWS::Lambda::Permission
+  LaceworkSecurityHubQueue:
+    Type: 'AWS::SQS::Queue'
     Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt "LaceworkSecurityHubEventFunction.Arn"
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt "LaceworkSecurityEvents.Arn"
+      QueueName: !Join ['', [!Ref ResourcePrefixName, '-Event-Queue']]
+      DelaySeconds: 0
+      MessageRetentionPeriod: 86400
+
+  LaceworkSecurityHubEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt LaceworkSecurityHubQueue.Arn
+      FunctionName: !GetAtt LaceworkSecurityHubEventFunction.Arn
