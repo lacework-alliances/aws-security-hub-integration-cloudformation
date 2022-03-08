@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: "Lacework AWS Control Tower Integration: Add the Lacework Cloud Security Platform for cloud-native threat detection, compliance, behavioral anomaly detection, and automated AWS security monitoring."
+Description: "Lacework AWS Security Hub Integration: Add the Lacework Cloud Security Platform for cloud-native threat detection, compliance, behavioral anomaly detection, and automated AWS security monitoring."
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:

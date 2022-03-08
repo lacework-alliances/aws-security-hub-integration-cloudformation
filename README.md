@@ -21,7 +21,7 @@ You need the following prerequisites to implement the Lacework AWS Security Hub 
 
 ### 2. Deploy the Lacework AWS Security Hub Integration with CloudFormation
 1. Login in to AWS master account with Administrator permissions.
-Click on the following Launch Stack button to go to your CloudFormation console and launch the AWS Control Integration template.
+Click on the following Launch Stack button to go to your CloudFormation console and launch the AWS Security Hub Integration template.
    
    [![Launch Stack](https://user-images.githubusercontent.com/6440106/150169828-1692c426-ce7a-4ee9-ae6e-0a0b2d9a99e8.png)](https://console.aws.amazon.com/cloudformation/home?#/stacks/create/review?templateURL=https://lacework-alliances.s3.us-west-2.amazonaws.com/lacework-aws-security-hub/templates/aws-security-hub-integration.yml)
 
@@ -41,7 +41,7 @@ Click on the following Launch Stack button to go to your CloudFormation console 
 
 ### 3. CloudFormation Progress
 
-1. Monitor the progress of the CloudFormation deployment. It takes several minutes for the stack to create the resources that enable the Lacework AWS Control Tower Integration.
+1. Monitor the progress of the CloudFormation deployment. It takes several minutes for the stack to create the resources that enable the Lacework AWS Security Hub Integration.
 2. When successfully completed, the stack shows CREATE_COMPLETE.
 
 ### 4. Validate the Lacework AWS Security Hub Integration
