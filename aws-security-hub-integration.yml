@@ -11,9 +11,6 @@ Metadata:
           - LaceworkAccessKeyID
           - LaceworkSecretKey
           - ResourcePrefixName
-          - CustomerAccounts
-          - CreateAlertChannelRules
-          - AlertChannelName
       - Label:
           default: "Advanced Configuration"
         Parameters:
@@ -30,12 +27,6 @@ Metadata:
         default: Lacework Secret Key
       ResourcePrefixName:
         default: Resource Prefix Name
-      CustomerAccounts:
-        default: Customer Accounts
-      CreateAlertChannelRules:
-        default: Create Lacework Alert Channel
-      AlertChannelName:
-        default: Alert Channel Name
       S3BucketName:
         default: Cloudformation S3 Bucket
       S3KeyPrefix:
@@ -72,24 +63,6 @@ Parameters:
     AllowedPattern: '^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$'
     ConstraintDescription: "Resource prefix name may contain alphanumeric characters and dashes only."
     Default: "Lacework-AWS-Security-Hub"
-  CustomerAccounts:
-    Type: String
-    Description: "Specify the comma-separated list of AWS Account IDs for which Lacework is monitoring."
-    AllowedPattern: '^$|^[0-9,]+(?:-[0-9,]+)*$'
-    ConstraintDescription: "Invalid list entered. AWS Account IDs are numeric only."
-  CreateAlertChannelRules:
-    Type: String
-    AllowedValues:
-      - "Yes"
-      - "No"
-    Default: "Yes"
-    Description: "Choose 'Yes' if you would like the Lacework Alert Channel and Rules automatically created for you. This Alert Channel and Rules will send its events to AWS Security Hub. Otherwise, you can create the Alert Channel and Rules manually."
-  AlertChannelName:
-    Type: String
-    Description: "Specify the name of the alert channel in Lacework."
-    AllowedPattern: '^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$'
-    ConstraintDescription: "Alert channel name may contain alphanumeric characters and dashes only."
-    Default: "Lacework-AWS-Security-Hub"
   # advanced
   S3BucketName:
     Type: String
@@ -101,10 +74,6 @@ Parameters:
     Default: lacework-aws-security-hub
     MinLength: '1'
     Description: "Enter the S3 key prefix for Lacework Security Hub Cloudformation assets directory. Use this if you want to customize your deployment."
-Conditions:
-  CreateNewAlertChannelRules: !Equals
-    - !Ref CreateAlertChannelRules
-    - 'Yes'
 Resources:
   LambdaZipsBucket:
     Type: AWS::S3::Bucket
@@ -227,7 +196,7 @@ Resources:
           lacework_access_key_id: !Ref LaceworkAccessKeyID
           lacework_secret_key: !Ref LaceworkSecretKey
           event_bus_arn: !GetAtt LaceworkSecurityHubEventBus.Arn
-          alert_channel_name: !Ref AlertChannelName
+          alert_channel_name: !Join [ "-", ["Lacework-Sec-Hub", !Select [2, !Split [ "/", !Ref 'AWS::StackId']]]]
       Role: !GetAtt LaceworkSecurityHubSetupFunctionRole.Arn
 
   LaceworkSecurityHubSetupFunctionRole:
@@ -244,8 +213,7 @@ Resources:
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 
-  LaceworkSecurityHubSetup: # this will launch the setup function. appropriate methods are called via crhelper in the function.
-    Condition: CreateNewAlertChannelRules
+  LaceworkSecurityHubSetup: # this will launch the setup function
     Type: AWS::CloudFormation::CustomResource
     Properties:
       ServiceToken:
@@ -318,12 +286,25 @@ Resources:
       Description: "Captures Lacework Security Events"
       EventBusName: !GetAtt LaceworkSecurityHubEventBus.Name
       EventPattern:
-        account: !Split [",", !Join [",", [!Ref CustomerAccounts, !Ref AWS::AccountId]]]
+        account: ["434813966438"]
       Name: !Join ['', [!Ref ResourcePrefixName, '-Event-Rule']]
       State: ENABLED
       Targets:
         - Arn: !GetAtt LaceworkSecurityHubQueue.Arn
           Id: lacework-security-hub-event-to-sqs-queue
+
+  EventBridgeToToSqsPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: SQS:SendMessage
+            Resource:  !GetAtt LaceworkSecurityHubQueue.Arn
+      Queues:
+        - !Ref LaceworkSecurityHubQueue
 
   LaceworkSecurityHubQueue:
     Type: 'AWS::SQS::Queue'

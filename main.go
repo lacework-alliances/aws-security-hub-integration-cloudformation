@@ -21,33 +21,33 @@ var (
 	LogE = funclog.NewErrorLogger("ERROR: ")
 )
 
-type PostAccessTokenRequest struct {
+type AccessTokenRequestPayload struct {
 	KeyId string `json:"keyId"`
 	ExpiryTime int `json:"expiryTime"`
 }
 
-type PostAccessTokenResponse struct {
+type AccessTokenResponsePayload struct {
 	ExpiresAt string `json:"expiresAt"`
 	Token string `json:"token"`
 }
 
-type PostAlertChannelRequest struct {
+type AlertChannelRequestPayload struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 	Enabled int `json:"enabled"`
-	Data PostAlertChannelRequestData `json:"data"`
+	Data AlertChannelRequestDataObject `json:"data"`
 }
 
-type PostAlertChannelRequestData struct {
+type AlertChannelRequestDataObject struct {
 	IssueGrouping string `json:"issueGrouping"`
 	EventBusArn string `json:"eventBusArn"`
 }
 
-type PostAlertChannelResponse struct {
-	Data PostAlertChannelResponseData `json:"data"`
+type AlertChannelResponsePayload struct {
+	Data AlertChannelResponseDataObject `json:"data"`
 }
 
-type PostAlertChannelResponseData struct {
+type AlertChannelResponseDataObject struct {
 	CreatedOrUpdatedBy string `json:"createdOrUpdatedBy"`
 	CreatedOrUpdatedTime string `json:"createdOrUpdatedTime"`
 	Enabled int `json:"enabled"`
@@ -60,13 +60,13 @@ type PostAlertChannelResponseData struct {
 	Data json.RawMessage `json:"data"`
 }
 
-type PostAlertRuleRequest struct {
-	Filters FiltersArray `json:"filters"`
+type AlertRuleRequestPayload struct {
+	Filters AlertRuleFiltersArray `json:"filters"`
 	IntgGuidList []string `json:"intgGuidList"`
 	Type string `json:"type"`
 }
 
-type FiltersArray struct {
+type AlertRuleFiltersArray struct {
 	Name string `json:"name"`
 	Description string `json:"description"`
 	Enabled int `json:"enabled"`
@@ -75,7 +75,35 @@ type FiltersArray struct {
 	Severity []int `json:"severity"`
 }
 
-type PostHoneycombRequest struct {
+type FilterPayload struct {
+	Filters []FilterExpression `json:"filters"`
+	Returns []string `json:"returns"`
+}
+
+type FilterExpression struct {
+	Expression string `json:"expression"`
+	Field string `json:"field"`
+	Value string `json:"value,omitempty"`
+	Values []string `json:"values,omitempty"`
+}
+
+type SearchAlertChannelResponsePayload struct {
+	Data []struct {
+		IntgGuid string `json:"intgGuid"`
+		Data struct {
+			IssueGrouping string `json:"issueGrouping"`
+			EventBusArn string `json:"eventBusArn"`
+		} `json:"data"`
+	} `json:"data"`
+}
+
+type SearchAlertRuleResponsePayload struct {
+	Data []struct {
+		McGuid string `json:"mcGuid"`
+	} `json:"data"`
+}
+
+type HoneycombRequestPayload struct {
 	Account string `json:"account"`
 	SubAccount string `json:"sub-account"`
 	TechPartner string `json:"tech-partner"`
@@ -145,11 +173,11 @@ func create(ctx context.Context, event cfn.Event) (physicalResourceID string, da
 	}
 
 	LogI.Println("Getting access token.")
-	if accessToken, err := sendPostAccessTokenRequest(laceworkUrl,accessKeyId,secretKey); err == nil {
+	if accessToken, err := createAccessToken(laceworkUrl,accessKeyId,secretKey); err == nil {
 		LogI.Println("Creating Alert Channel.")
-		if intgGuid, err := sendPostAlertChannelRequest(alertChannelName,eventBusArn,laceworkUrl,*accessToken,subAccountName); err == nil {
+		if intgGuid, err := createAlertChannel(alertChannelName,eventBusArn,laceworkUrl,accessToken,subAccountName); err == nil {
 			LogI.Println("Creating Alert Rule.")
-			if err := sendPostAlertRuleRequest(alertChannelName,*intgGuid,laceworkUrl,*accessToken,subAccountName); err != nil {
+			if err := createAlertRule(alertChannelName,intgGuid,laceworkUrl,accessToken,subAccountName); err != nil {
 				return event.PhysicalResourceID,nil,err
 			}
 		} else {
@@ -169,18 +197,34 @@ func delete(ctx context.Context, event cfn.Event) (physicalResourceID string, da
 	LogI.Printf("CloudFormation event received: %+v \n",event)
 	laceworkUrl := os.Getenv("lacework_url")
 	subAccountName := os.Getenv("lacework_sub_account_name")
+	accessKeyId := os.Getenv("lacework_access_key_id")
+	secretKey := os.Getenv("lacework_secret_key")
+	alertChannelName := os.Getenv("alert_channel_name")
 	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"delete started",subAccountName,"{}")
 
-	/**
-	TODO: Delete alert channel, delete alert rule
-	 */
+	if accessToken, err := createAccessToken(laceworkUrl,accessKeyId,secretKey); err == nil {
+		if intgGuid, err := searchAlertChannels(alertChannelName, laceworkUrl, accessToken, subAccountName); err == nil {
+			deleteAlertChannel(intgGuid, laceworkUrl, accessToken, subAccountName)
+		} else {
+			LogW.Printf("Unable to search: %v",err)
+		}
+
+		if mcGuid, err := searchAlertRules(alertChannelName, laceworkUrl,  accessToken, subAccountName); err == nil {
+			deleteAlertRule(mcGuid, laceworkUrl, accessToken, subAccountName)
+		} else {
+			LogW.Printf("Unable to search: %v",err)
+		}
+	} else {
+		LogW.Println("Did not get access token in order to delete alert channel and alert rule.")
+	}
+
 	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"delete completed",subAccountName,"{}")
 
 	return event.PhysicalResourceID,nil,nil
 }
 
-func sendPostAccessTokenRequest(laceworkUrl string, accessKeyId string, secretKey string) (*string, error) {
-	requestPayload := PostAccessTokenRequest {
+func createAccessToken(laceworkUrl string, accessKeyId string, secretKey string) (string, error) {
+	requestPayload := AccessTokenRequestPayload {
 		KeyId: accessKeyId,
 		ExpiryTime: 86400,
 	}
@@ -188,7 +232,7 @@ func sendPostAccessTokenRequest(laceworkUrl string, accessKeyId string, secretKe
 		request, err := http.NewRequest(http.MethodPost, "https://" + laceworkUrl + "/api/v2/access/tokens", bytes.NewBuffer(payloadBytes))
 
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 
 		request.Header.Add("X-LW-UAKS", secretKey)
@@ -196,32 +240,32 @@ func sendPostAccessTokenRequest(laceworkUrl string, accessKeyId string, secretKe
 
 		if resp, err  := http.DefaultClient.Do(request); err == nil {
 			defer resp.Body.Close()
-			respData := PostAccessTokenResponse{}
+			respData := AccessTokenResponsePayload{}
 			if err := json.NewDecoder(resp.Body).Decode(&respData); err == nil {
-				LogI.Printf("PostAccessTokenResponse: %+v",respData)
+				LogI.Printf("AccessTokenResponsePayload: %+v",respData)
 			} else {
 				LogE.Printf("Unable to get response body: %v",err)
-				return nil, err
+				return "", err
 			}
 			if resp.StatusCode == http.StatusCreated {
-				return &respData.Token, nil
+				return respData.Token, nil
 			} else {
-				return nil,errors.New(fmt.Sprintf("Failed to get access token. Response status is %d",resp.StatusCode))
+				return "",errors.New(fmt.Sprintf("Failed to get access token. Response status is %d",resp.StatusCode))
 			}
 		} else {
-			return nil, err
+			return "", err
 		}
 	} else {
-		return nil, err
+		return "", err
 	}
 }
 
-func sendPostAlertChannelRequest(name string, eventBusArn string, laceworkUrl string, accessToken string, subAccountName string) (*string, error) {
-	requestPayload := PostAlertChannelRequest {
+func createAlertChannel(name string, eventBusArn string, laceworkUrl string, accessToken string, subAccountName string) (string, error) {
+	requestPayload := AlertChannelRequestPayload {
 		Name: name,
 		Type: "CloudwatchEb",
 		Enabled: 1,
-		Data: PostAlertChannelRequestData {
+		Data: AlertChannelRequestDataObject {
 			IssueGrouping: "Events",
 			EventBusArn: eventBusArn,
 		},
@@ -230,33 +274,92 @@ func sendPostAlertChannelRequest(name string, eventBusArn string, laceworkUrl st
 		if resp, err  := sendApiPostRequest(laceworkUrl,"/api/v2/AlertChannels",accessToken,payloadBytes,subAccountName); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusCreated {
-				respData := PostAlertChannelResponse{}
+				respData := AlertChannelResponsePayload{}
 				if err := json.NewDecoder(resp.Body).Decode(&respData); err == nil {
 					respDump, err := httputil.DumpResponse(resp, true)
 					if err != nil {
 						LogW.Println(err)
 					}
 					LogI.Printf("Received response: %s", string(respDump))
-					return &respData.Data.IntgGuid, nil
+					return respData.Data.IntgGuid, nil
 				} else {
 					LogE.Printf("Unable to get response body: %v",err)
-					return nil, err
+					return "", err
 				}
 			} else {
-				return nil,errors.New(fmt.Sprintf("Failed sending alert channel request. Response status is %d",resp.StatusCode))
+				return "",errors.New(fmt.Sprintf("Failed sending alert channel request. Response status is %d",resp.StatusCode))
 			}
 
 		} else {
-			return nil, err
+			return "", err
 		}
 	} else {
-		return nil, err
+		return "", err
 	}
 }
 
-func sendPostAlertRuleRequest(name string,intgGuid string, laceworkUrl string, accessToken string, subAccountName string) error {
-	requestPayload := PostAlertRuleRequest {
-		Filters: FiltersArray {
+func deleteAlertChannel(intgGuid string, laceworkUrl string, accessToken string, subAccountName string) (error) {
+	if resp, err  := sendApiDeleteRequest(laceworkUrl,"/api/v2/AlertChannels/"+intgGuid,accessToken,subAccountName); err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNoContent {
+			return nil
+		} else {
+			return errors.New(fmt.Sprintf("Failed sending delete alert channel request. Response status is %d",resp.StatusCode))
+		}
+
+	} else {
+		return err
+	}
+}
+
+func searchAlertChannels(name string, laceworkUrl string, accessToken string, subAccountName string) (string, error) {
+	requestPayload := FilterPayload {
+		Filters: []FilterExpression{
+			{
+				Expression: "eq",
+				Field: "name",
+				Value: name,
+			},
+		},
+		Returns: []string{
+			"intgGuid",
+		},
+	}
+	if payloadBytes, err := json.Marshal(requestPayload); err == nil {
+		if resp, err  := sendApiPostRequest(laceworkUrl,"/api/v2/AlertChannels/search",accessToken,payloadBytes,subAccountName); err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				respData := SearchAlertChannelResponsePayload{}
+				if err := json.NewDecoder(resp.Body).Decode(&respData); err == nil {
+					respDump, err := httputil.DumpResponse(resp, true)
+					if err != nil {
+						LogW.Println(err)
+					}
+					LogI.Printf("Received response: %s", string(respDump))
+					if len(respData.Data) == 0 {
+						LogW.Println("No results returned.")
+						return "", err
+					} else {
+						return respData.Data[0].IntgGuid, nil
+					}
+				} else {
+					LogE.Printf("Unable to get response body: %v",err)
+					return "", err
+				}
+			} else {
+				return "",errors.New(fmt.Sprintf("Failed sending search request. Response status is %d",resp.StatusCode))
+			}
+		} else {
+			return "", err
+		}
+	} else {
+		return "", err
+	}
+}
+
+func createAlertRule(name string, intgGuid string, laceworkUrl string, accessToken string, subAccountName string) error {
+	requestPayload := AlertRuleRequestPayload {
+		Filters: AlertRuleFiltersArray {
 			Name: name,
 			Description: "Alert rule for Lacework AWS Security Hub",
 			Enabled: 1,
@@ -288,6 +391,65 @@ func sendPostAlertRuleRequest(name string,intgGuid string, laceworkUrl string, a
 	}
 }
 
+func deleteAlertRule(mcGuid string, laceworkUrl string, accessToken string, subAccountName string) (error) {
+	if resp, err  := sendApiDeleteRequest(laceworkUrl,"/api/v2/AlertRules/"+mcGuid,accessToken,subAccountName); err == nil {
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNoContent {
+			return nil
+		} else {
+			return errors.New(fmt.Sprintf("Failed sending delete alert channel request. Response status is %d",resp.StatusCode))
+		}
+
+	} else {
+		return err
+	}
+}
+
+func searchAlertRules(name string, laceworkUrl string, accessToken string, subAccountName string) (string, error) {
+	requestPayload := FilterPayload {
+		Filters: []FilterExpression{
+			{
+				Expression: "eq",
+				Field: "filters.name",
+				Value: name,
+			},
+		},
+		Returns: []string{
+			"mcGuid",
+		},
+	}
+	if payloadBytes, err := json.Marshal(requestPayload); err == nil {
+		if resp, err  := sendApiPostRequest(laceworkUrl,"/api/v2/AlertRules/search",accessToken,payloadBytes,subAccountName); err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				respData := SearchAlertRuleResponsePayload{}
+				if err := json.NewDecoder(resp.Body).Decode(&respData); err == nil {
+					respDump, err := httputil.DumpResponse(resp, true)
+					if err != nil {
+						LogW.Println(err)
+					}
+					LogI.Printf("Received response: %s", string(respDump))
+					if len(respData.Data) == 0 {
+						LogW.Println("No results returned.")
+						return "", err
+					} else {
+						return respData.Data[0].McGuid, nil
+					}
+				} else {
+					LogE.Printf("Unable to get response body: %v",err)
+					return "", err
+				}
+			} else {
+				return "",errors.New(fmt.Sprintf("Failed sending search request. Response status is %d",resp.StatusCode))
+			}
+		} else {
+			return "", err
+		}
+	} else {
+		return "", err
+	}
+}
+
 func sendApiPostRequest(laceworkUrl string, api string, accessToken string, requestPayload []byte, subAccountName string) (*http.Response, error) {
 	request, err := http.NewRequest(http.MethodPost, "https://" + laceworkUrl + api, bytes.NewBuffer(requestPayload))
 
@@ -312,11 +474,35 @@ func sendApiPostRequest(laceworkUrl string, api string, accessToken string, requ
 	return http.DefaultClient.Do(request)
 }
 
+func sendApiDeleteRequest(laceworkUrl string, api string, accessToken string, subAccountName string) (*http.Response, error) {
+	request, err := http.NewRequest(http.MethodDelete, "https://" + laceworkUrl + api, nil)
+
+	if err != nil {
+		LogE.Printf("Error creating API delete request: %v\n",err)
+		return nil, err
+	}
+
+	request.Header.Add("Authorization", accessToken)
+	request.Header.Add("content-type", "application/json")
+
+	if subAccountName != "" {
+		request.Header.Add("Account-Name", subAccountName)
+	}
+
+	requestDump, err := httputil.DumpRequest(request, true)
+	if err != nil {
+		LogW.Println(err)
+	}
+	LogI.Printf("Sending request: %s", string(requestDump))
+
+	return http.DefaultClient.Do(request)
+}
+
 func sendHoneycombEvent(account string, event string, subAccountName string, eventData string) {
 	if eventData == "" {
 		eventData = "{}"
 	}
-	requestPayload := PostHoneycombRequest {
+	requestPayload := HoneycombRequestPayload {
 		Account: account,
 		SubAccount: subAccountName,
 		TechPartner: "AWS",

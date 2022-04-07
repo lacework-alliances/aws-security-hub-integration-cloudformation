@@ -2,7 +2,7 @@ BUCKET_NAME := lacework-alliances
 KEY_PREFIX := lacework-aws-security-hub
 LAMBDA_PREFIX := lambda/
 CFT_PREFIX := templates/
-HONEY_DATASET := lacework-alliances-dev
+HONEY_DATASET := lacework-alliances-prod
 
 PROFILE ?= ct
 REGION ?= us-west-2
