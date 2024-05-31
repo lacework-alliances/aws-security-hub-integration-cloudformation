@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: "Lacework AWS Control Tower Integration: Add the Lacework Cloud Security Platform for cloud-native threat detection, compliance, behavioral anomaly detection, and automated AWS security monitoring."
+Description: "Integrate Lacework with AWS Security Hub to manage your AWS posture and compliance events from a single, consolidated view."
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -126,7 +126,7 @@ Resources:
     Properties:
       Description: Copies objects from the S3 bucket to a new location.
       Handler: index.handler
-      Runtime: python3.7
+      Runtime: python3.9
       Role: !GetAtt 'CopyZipsRole.Arn'
       Timeout: 240
       Code:
@@ -187,8 +187,8 @@ Resources:
       Code:
         S3Bucket: !Ref LambdaZipsBucket
         S3Key: !Join ['', [!Ref 'S3KeyPrefix', '/lambda/setup.zip']]
-      Handler: main
-      Runtime: go1.x
+      Handler: bootstrap
+      Runtime: provided.al2023
       Environment:
         Variables:
           lacework_url: !Ref LaceworkURL
@@ -253,10 +253,10 @@ Resources:
       Code:
         S3Bucket: !Ref LambdaZipsBucket
         S3Key: !Join ['', [!Ref 'S3KeyPrefix', '/lambda/function.zip']]
-      Handler: main
+      Handler: bootstrap
       MemorySize: 256
       Timeout: 30
-      Runtime: go1.x
+      Runtime: provided.al2023
       Environment:
         Variables:
           DEFAULT_AWS_ACCOUNT: !Ref AWS::AccountId

@@ -22,25 +22,25 @@ var (
 )
 
 type AccessTokenRequestPayload struct {
-	KeyId string `json:"keyId"`
-	ExpiryTime int `json:"expiryTime"`
+	KeyId      string `json:"keyId"`
+	ExpiryTime int    `json:"expiryTime"`
 }
 
 type AccessTokenResponsePayload struct {
 	ExpiresAt string `json:"expiresAt"`
-	Token string `json:"token"`
+	Token     string `json:"token"`
 }
 
 type AlertChannelRequestPayload struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-	Enabled int `json:"enabled"`
-	Data AlertChannelRequestDataObject `json:"data"`
+	Name    string                        `json:"name"`
+	Type    string                        `json:"type"`
+	Enabled int                           `json:"enabled"`
+	Data    AlertChannelRequestDataObject `json:"data"`
 }
 
 type AlertChannelRequestDataObject struct {
 	IssueGrouping string `json:"issueGrouping"`
-	EventBusArn string `json:"eventBusArn"`
+	EventBusArn   string `json:"eventBusArn"`
 }
 
 type AlertChannelResponsePayload struct {
@@ -48,51 +48,51 @@ type AlertChannelResponsePayload struct {
 }
 
 type AlertChannelResponseDataObject struct {
-	CreatedOrUpdatedBy string `json:"createdOrUpdatedBy"`
-	CreatedOrUpdatedTime string `json:"createdOrUpdatedTime"`
-	Enabled int `json:"enabled"`
-	IntgGuid string `json:"intgGuid"`
-	IsOrg int `json:"isOrg"`
-	Name string `json:"name"`
-	Props json.RawMessage `json:"props"`
-	State json.RawMessage `json:"state"`
-	Type string `json:"type"`
-	Data json.RawMessage `json:"data"`
+	CreatedOrUpdatedBy   string          `json:"createdOrUpdatedBy"`
+	CreatedOrUpdatedTime string          `json:"createdOrUpdatedTime"`
+	Enabled              int             `json:"enabled"`
+	IntgGuid             string          `json:"intgGuid"`
+	IsOrg                int             `json:"isOrg"`
+	Name                 string          `json:"name"`
+	Props                json.RawMessage `json:"props"`
+	State                json.RawMessage `json:"state"`
+	Type                 string          `json:"type"`
+	Data                 json.RawMessage `json:"data"`
 }
 
 type AlertRuleRequestPayload struct {
-	Filters AlertRuleFiltersArray `json:"filters"`
-	IntgGuidList []string `json:"intgGuidList"`
-	Type string `json:"type"`
+	Filters      AlertRuleFiltersArray `json:"filters"`
+	IntgGuidList []string              `json:"intgGuidList"`
+	Type         string                `json:"type"`
 }
 
 type AlertRuleFiltersArray struct {
-	Name string `json:"name"`
-	Description string `json:"description"`
-	Enabled int `json:"enabled"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	Enabled        int      `json:"enabled"`
 	ResourceGroups []string `json:"resourceGroups"`
-	EventCategory []string `json:"eventCategory"`
-	Severity []int `json:"severity"`
+	EventCategory  []string `json:"eventCategory"`
+	Severity       []int    `json:"severity"`
 }
 
 type FilterPayload struct {
 	Filters []FilterExpression `json:"filters"`
-	Returns []string `json:"returns"`
+	Returns []string           `json:"returns"`
 }
 
 type FilterExpression struct {
-	Expression string `json:"expression"`
-	Field string `json:"field"`
-	Value string `json:"value,omitempty"`
-	Values []string `json:"values,omitempty"`
+	Expression string   `json:"expression"`
+	Field      string   `json:"field"`
+	Value      string   `json:"value,omitempty"`
+	Values     []string `json:"values,omitempty"`
 }
 
 type SearchAlertChannelResponsePayload struct {
 	Data []struct {
 		IntgGuid string `json:"intgGuid"`
-		Data struct {
+		Data     struct {
 			IssueGrouping string `json:"issueGrouping"`
-			EventBusArn string `json:"eventBusArn"`
+			EventBusArn   string `json:"eventBusArn"`
 		} `json:"data"`
 	} `json:"data"`
 }
@@ -104,43 +104,43 @@ type SearchAlertRuleResponsePayload struct {
 }
 
 type HoneycombRequestPayload struct {
-	Account string `json:"account"`
-	SubAccount string `json:"sub-account"`
-	TechPartner string `json:"tech-partner"`
+	Account         string `json:"account"`
+	SubAccount      string `json:"sub-account"`
+	TechPartner     string `json:"tech-partner"`
 	IntegrationName string `json:"integration-name"`
-	Version string `json:"version"`
-	Service string `json:"service"`
-	InstallMethod string `json:"install-method"`
-	Function string `json:"function"`
-	Event string `json:"event"`
-	EventData string `json:"event-data"`
+	Version         string `json:"version"`
+	Service         string `json:"service"`
+	InstallMethod   string `json:"install-method"`
+	Function        string `json:"function"`
+	Event           string `json:"event"`
+	EventData       string `json:"event-data"`
 }
 
-//create the alert channel with
+// create the alert channel with
 func main() {
 	lambda.Start(cfn.LambdaWrap(handler))
 }
 
 func handler(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
 	if event.RequestType == cfn.RequestCreate {
-		return create(ctx,event)
+		return create(ctx, event)
 	} else if event.RequestType == cfn.RequestDelete {
-		return delete(ctx,event)
+		return delete(ctx, event)
 	} else {
-		LogW.Println("CloudFormation event not supported: ",event.RequestType)
-		return "",nil,nil
+		LogW.Println("CloudFormation event not supported: ", event.RequestType)
+		return "", nil, nil
 	}
 }
 
 func create(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
-	LogI.Printf("CloudFormation event received: %+v \n",event)
+	LogI.Printf("CloudFormation event received: %+v \n", event)
 	laceworkUrl := os.Getenv("lacework_url")
 	subAccountName := os.Getenv("lacework_sub_account_name")
 	accessKeyId := os.Getenv("lacework_access_key_id")
 	secretKey := os.Getenv("lacework_secret_key")
 	eventBusArn := os.Getenv("event_bus_arn")
 	alertChannelName := os.Getenv("alert_channel_name")
-	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"create started",subAccountName,"{}")
+	sendHoneycombEvent(strings.Split(laceworkUrl, ".")[0], "create started", subAccountName, "{}")
 
 	valid := true
 
@@ -169,67 +169,78 @@ func create(ctx context.Context, event cfn.Event) (physicalResourceID string, da
 	}
 
 	if !valid {
-		return event.PhysicalResourceID,nil,errors.New("unable to run setup due to missing required environment variables")
+		return event.PhysicalResourceID, nil, errors.New("unable to run setup due to missing required environment variables")
 	}
 
 	LogI.Println("Getting access token.")
-	if accessToken, err := createAccessToken(laceworkUrl,accessKeyId,secretKey); err == nil {
-		LogI.Println("Creating Alert Channel.")
-		if intgGuid, err := createAlertChannel(alertChannelName,eventBusArn,laceworkUrl,accessToken,subAccountName); err == nil {
-			LogI.Println("Creating Alert Rule.")
-			if err := createAlertRule(alertChannelName,intgGuid,laceworkUrl,accessToken,subAccountName); err != nil {
-				return event.PhysicalResourceID,nil,err
+	if accessToken, err := createAccessToken(laceworkUrl, accessKeyId, secretKey); err == nil {
+		if intgGuid, err := searchAlertChannels(alertChannelName, laceworkUrl, accessToken, subAccountName); err == nil {
+			if intgGuid == "" {
+				LogI.Println("Creating Alert Channel.")
+				if intgGuid, err := createAlertChannel(alertChannelName, eventBusArn, laceworkUrl, accessToken, subAccountName); err == nil {
+					LogI.Println("Creating Alert Rule.")
+					if err := createAlertRule(alertChannelName, intgGuid, laceworkUrl, accessToken, subAccountName); err != nil {
+						return event.PhysicalResourceID, nil, err
+					}
+				} else {
+					errMsg := fmt.Sprintf("Failed creating alert channel: %v", err)
+					LogE.Println(errMsg)
+					return event.PhysicalResourceID, nil, err
+				}
+			} else {
+				LogI.Println("Alert Channel already exists.")
 			}
 		} else {
-			errMsg := fmt.Sprintf("Failed creating alert channel: %v",err)
-			LogE.Println(errMsg)
-			return event.PhysicalResourceID,nil,err
+			LogW.Printf("Unable to search: %v", err)
 		}
+
 	} else {
-		return event.PhysicalResourceID,nil,err
+		return event.PhysicalResourceID, nil, err
 	}
 
-	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"create completed",subAccountName,"{}")
-	return event.PhysicalResourceID,nil,nil
+	sendHoneycombEvent(strings.Split(laceworkUrl, ".")[0], "create completed", subAccountName, "{}")
+	return event.PhysicalResourceID, nil, nil
 }
 
 func delete(ctx context.Context, event cfn.Event) (physicalResourceID string, data map[string]interface{}, err error) {
-	LogI.Printf("CloudFormation event received: %+v \n",event)
+	LogI.Printf("CloudFormation event received: %+v \n", event)
 	laceworkUrl := os.Getenv("lacework_url")
 	subAccountName := os.Getenv("lacework_sub_account_name")
 	accessKeyId := os.Getenv("lacework_access_key_id")
 	secretKey := os.Getenv("lacework_secret_key")
 	alertChannelName := os.Getenv("alert_channel_name")
-	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"delete started",subAccountName,"{}")
+	sendHoneycombEvent(strings.Split(laceworkUrl, ".")[0], "delete started", subAccountName, "{}")
 
-	if accessToken, err := createAccessToken(laceworkUrl,accessKeyId,secretKey); err == nil {
+	if accessToken, err := createAccessToken(laceworkUrl, accessKeyId, secretKey); err == nil {
 		if intgGuid, err := searchAlertChannels(alertChannelName, laceworkUrl, accessToken, subAccountName); err == nil {
-			deleteAlertChannel(intgGuid, laceworkUrl, accessToken, subAccountName)
+			if intgGuid != "" {
+				deleteAlertChannel(intgGuid, laceworkUrl, accessToken, subAccountName)
+			}
 		} else {
-			LogW.Printf("Unable to search: %v",err)
+			LogW.Printf("Unable to search: %v", err)
 		}
 
-		if mcGuid, err := searchAlertRules(alertChannelName, laceworkUrl,  accessToken, subAccountName); err == nil {
+		if mcGuid, err := searchAlertRules(alertChannelName, laceworkUrl, accessToken, subAccountName); err == nil {
 			deleteAlertRule(mcGuid, laceworkUrl, accessToken, subAccountName)
 		} else {
-			LogW.Printf("Unable to search: %v",err)
+			LogW.Printf("Unable to search: %v", err)
 		}
 	} else {
 		LogW.Println("Did not get access token in order to delete alert channel and alert rule.")
 	}
 
-	sendHoneycombEvent(strings.Split(laceworkUrl,".")[0],"delete completed",subAccountName,"{}")
+	sendHoneycombEvent(strings.Split(laceworkUrl, ".")[0], "delete completed", subAccountName, "{}")
 
-	return event.PhysicalResourceID,nil,nil
+	return event.PhysicalResourceID, nil, nil
 }
 
 func createAccessToken(laceworkUrl string, accessKeyId string, secretKey string) (string, error) {
-	requestPayload := AccessTokenRequestPayload {
-		KeyId: accessKeyId,
+	requestPayload := AccessTokenRequestPayload{
+		KeyId:      accessKeyId,
 		ExpiryTime: 86400,
 	}
 	if payloadBytes, err := json.Marshal(requestPayload); err == nil {
-		request, err := http.NewRequest(http.MethodPost, "https://" + laceworkUrl + "/api/v2/access/tokens", bytes.NewBuffer(payloadBytes))
+		request, err := http.NewRequest(http.MethodPost, "https://"+laceworkUrl+"/api/v2/access/tokens", bytes.NewBuffer(payloadBytes))
 
 		if err != nil {
 			return "", err
@@ -238,19 +249,19 @@ func createAccessToken(laceworkUrl string, accessKeyId string, secretKey string)
 		request.Header.Add("X-LW-UAKS", secretKey)
 		request.Header.Add("content-type", "application/json")
 
-		if resp, err  := http.DefaultClient.Do(request); err == nil {
+		if resp, err := http.DefaultClient.Do(request); err == nil {
 			defer resp.Body.Close()
 			respData := AccessTokenResponsePayload{}
 			if err := json.NewDecoder(resp.Body).Decode(&respData); err == nil {
-				LogI.Printf("AccessTokenResponsePayload: %+v",respData)
+				LogI.Printf("AccessTokenResponsePayload: %+v", respData)
 			} else {
-				LogE.Printf("Unable to get response body: %v",err)
+				LogE.Printf("Unable to get response body: %v", err)
 				return "", err
 			}
 			if resp.StatusCode == http.StatusCreated {
 				return respData.Token, nil
 			} else {
-				return "",errors.New(fmt.Sprintf("Failed to get access token. Response status is %d",resp.StatusCode))
+				return "", errors.New(fmt.Sprintf("Failed to get access token. Response status is %d", resp.StatusCode))
 			}
 		} else {
 			return "", err
@@ -261,17 +272,17 @@ func createAccessToken(laceworkUrl string, accessKeyId string, secretKey string)
 }
 
 func createAlertChannel(name string, eventBusArn string, laceworkUrl string, accessToken string, subAccountName string) (string, error) {
-	requestPayload := AlertChannelRequestPayload {
-		Name: name,
-		Type: "CloudwatchEb",
+	requestPayload := AlertChannelRequestPayload{
+		Name:    name,
+		Type:    "CloudwatchEb",
 		Enabled: 1,
-		Data: AlertChannelRequestDataObject {
+		Data: AlertChannelRequestDataObject{
 			IssueGrouping: "Events",
-			EventBusArn: eventBusArn,
+			EventBusArn:   eventBusArn,
 		},
 	}
 	if payloadBytes, err := json.Marshal(requestPayload); err == nil {
-		if resp, err  := sendApiPostRequest(laceworkUrl,"/api/v2/AlertChannels",accessToken,payloadBytes,subAccountName); err == nil {
+		if resp, err := sendApiPostRequest(laceworkUrl, "/api/v2/AlertChannels", accessToken, payloadBytes, subAccountName); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusCreated {
 				respData := AlertChannelResponsePayload{}
@@ -283,11 +294,11 @@ func createAlertChannel(name string, eventBusArn string, laceworkUrl string, acc
 					LogI.Printf("Received response: %s", string(respDump))
 					return respData.Data.IntgGuid, nil
 				} else {
-					LogE.Printf("Unable to get response body: %v",err)
+					LogE.Printf("Unable to get response body: %v", err)
 					return "", err
 				}
 			} else {
-				return "",errors.New(fmt.Sprintf("Failed sending alert channel request. Response status is %d",resp.StatusCode))
+				return "", errors.New(fmt.Sprintf("Failed sending alert channel request. Response status is %d", resp.StatusCode))
 			}
 
 		} else {
@@ -298,13 +309,13 @@ func createAlertChannel(name string, eventBusArn string, laceworkUrl string, acc
 	}
 }
 
-func deleteAlertChannel(intgGuid string, laceworkUrl string, accessToken string, subAccountName string) (error) {
-	if resp, err  := sendApiDeleteRequest(laceworkUrl,"/api/v2/AlertChannels/"+intgGuid,accessToken,subAccountName); err == nil {
+func deleteAlertChannel(intgGuid string, laceworkUrl string, accessToken string, subAccountName string) error {
+	if resp, err := sendApiDeleteRequest(laceworkUrl, "/api/v2/AlertChannels/"+intgGuid, accessToken, subAccountName); err == nil {
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusNoContent {
 			return nil
 		} else {
-			return errors.New(fmt.Sprintf("Failed sending delete alert channel request. Response status is %d",resp.StatusCode))
+			return errors.New(fmt.Sprintf("Failed sending delete alert channel request. Response status is %d", resp.StatusCode))
 		}
 
 	} else {
@@ -313,12 +324,12 @@ func deleteAlertChannel(intgGuid string, laceworkUrl string, accessToken string,
 }
 
 func searchAlertChannels(name string, laceworkUrl string, accessToken string, subAccountName string) (string, error) {
-	requestPayload := FilterPayload {
+	requestPayload := FilterPayload{
 		Filters: []FilterExpression{
 			{
 				Expression: "eq",
-				Field: "name",
-				Value: name,
+				Field:      "name",
+				Value:      name,
 			},
 		},
 		Returns: []string{
@@ -326,7 +337,7 @@ func searchAlertChannels(name string, laceworkUrl string, accessToken string, su
 		},
 	}
 	if payloadBytes, err := json.Marshal(requestPayload); err == nil {
-		if resp, err  := sendApiPostRequest(laceworkUrl,"/api/v2/AlertChannels/search",accessToken,payloadBytes,subAccountName); err == nil {
+		if resp, err := sendApiPostRequest(laceworkUrl, "/api/v2/AlertChannels/search", accessToken, payloadBytes, subAccountName); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				respData := SearchAlertChannelResponsePayload{}
@@ -343,11 +354,13 @@ func searchAlertChannels(name string, laceworkUrl string, accessToken string, su
 						return respData.Data[0].IntgGuid, nil
 					}
 				} else {
-					LogE.Printf("Unable to get response body: %v",err)
+					LogE.Printf("Unable to get response body: %v", err)
 					return "", err
 				}
+			} else if resp.StatusCode == http.StatusNoContent {
+				return "", nil
 			} else {
-				return "",errors.New(fmt.Sprintf("Failed sending search request. Response status is %d",resp.StatusCode))
+				return "", errors.New(fmt.Sprintf("Failed sending search request. Response status is %d", resp.StatusCode))
 			}
 		} else {
 			return "", err
@@ -358,20 +371,20 @@ func searchAlertChannels(name string, laceworkUrl string, accessToken string, su
 }
 
 func createAlertRule(name string, intgGuid string, laceworkUrl string, accessToken string, subAccountName string) error {
-	requestPayload := AlertRuleRequestPayload {
-		Filters: AlertRuleFiltersArray {
-			Name: name,
-			Description: "Alert rule for Lacework AWS Security Hub",
-			Enabled: 1,
+	requestPayload := AlertRuleRequestPayload{
+		Filters: AlertRuleFiltersArray{
+			Name:           name,
+			Description:    "Alert rule for Lacework AWS Security Hub",
+			Enabled:        1,
 			ResourceGroups: []string{},
-			EventCategory: []string{},
-			Severity: []int{1,2,3,4,5},
+			EventCategory:  []string{},
+			Severity:       []int{1, 2, 3, 4, 5},
 		},
 		IntgGuidList: []string{intgGuid},
-		Type: "Event",
+		Type:         "Event",
 	}
 	if payloadBytes, err := json.Marshal(requestPayload); err == nil {
-		if resp, err  := sendApiPostRequest(laceworkUrl,"/api/v2/AlertRules",accessToken,payloadBytes,subAccountName); err == nil {
+		if resp, err := sendApiPostRequest(laceworkUrl, "/api/v2/AlertRules", accessToken, payloadBytes, subAccountName); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusCreated {
 				respDump, err := httputil.DumpResponse(resp, true)
@@ -381,7 +394,7 @@ func createAlertRule(name string, intgGuid string, laceworkUrl string, accessTok
 				LogI.Printf("Received response: %s", string(respDump))
 				return nil
 			} else {
-				return errors.New(fmt.Sprintf("Failed sending alert rule request. Response status is %d",resp.StatusCode))
+				return errors.New(fmt.Sprintf("Failed sending alert rule request. Response status is %d", resp.StatusCode))
 			}
 		} else {
 			return err
@@ -391,13 +404,13 @@ func createAlertRule(name string, intgGuid string, laceworkUrl string, accessTok
 	}
 }
 
-func deleteAlertRule(mcGuid string, laceworkUrl string, accessToken string, subAccountName string) (error) {
-	if resp, err  := sendApiDeleteRequest(laceworkUrl,"/api/v2/AlertRules/"+mcGuid,accessToken,subAccountName); err == nil {
+func deleteAlertRule(mcGuid string, laceworkUrl string, accessToken string, subAccountName string) error {
+	if resp, err := sendApiDeleteRequest(laceworkUrl, "/api/v2/AlertRules/"+mcGuid, accessToken, subAccountName); err == nil {
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusNoContent {
 			return nil
 		} else {
-			return errors.New(fmt.Sprintf("Failed sending delete alert channel request. Response status is %d",resp.StatusCode))
+			return errors.New(fmt.Sprintf("Failed sending delete alert channel request. Response status is %d", resp.StatusCode))
 		}
 
 	} else {
@@ -406,12 +419,12 @@ func deleteAlertRule(mcGuid string, laceworkUrl string, accessToken string, subA
 }
 
 func searchAlertRules(name string, laceworkUrl string, accessToken string, subAccountName string) (string, error) {
-	requestPayload := FilterPayload {
+	requestPayload := FilterPayload{
 		Filters: []FilterExpression{
 			{
 				Expression: "eq",
-				Field: "filters.name",
-				Value: name,
+				Field:      "filters.name",
+				Value:      name,
 			},
 		},
 		Returns: []string{
@@ -419,7 +432,7 @@ func searchAlertRules(name string, laceworkUrl string, accessToken string, subAc
 		},
 	}
 	if payloadBytes, err := json.Marshal(requestPayload); err == nil {
-		if resp, err  := sendApiPostRequest(laceworkUrl,"/api/v2/AlertRules/search",accessToken,payloadBytes,subAccountName); err == nil {
+		if resp, err := sendApiPostRequest(laceworkUrl, "/api/v2/AlertRules/search", accessToken, payloadBytes, subAccountName); err == nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				respData := SearchAlertRuleResponsePayload{}
@@ -436,11 +449,11 @@ func searchAlertRules(name string, laceworkUrl string, accessToken string, subAc
 						return respData.Data[0].McGuid, nil
 					}
 				} else {
-					LogE.Printf("Unable to get response body: %v",err)
+					LogE.Printf("Unable to get response body: %v", err)
 					return "", err
 				}
 			} else {
-				return "",errors.New(fmt.Sprintf("Failed sending search request. Response status is %d",resp.StatusCode))
+				return "", errors.New(fmt.Sprintf("Failed sending search request. Response status is %d", resp.StatusCode))
 			}
 		} else {
 			return "", err
@@ -451,10 +464,10 @@ func searchAlertRules(name string, laceworkUrl string, accessToken string, subAc
 }
 
 func sendApiPostRequest(laceworkUrl string, api string, accessToken string, requestPayload []byte, subAccountName string) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodPost, "https://" + laceworkUrl + api, bytes.NewBuffer(requestPayload))
+	request, err := http.NewRequest(http.MethodPost, "https://"+laceworkUrl+api, bytes.NewBuffer(requestPayload))
 
 	if err != nil {
-		LogE.Printf("Error creating API post request: %v %v\n",err,requestPayload)
+		LogE.Printf("Error creating API post request: %v %v\n", err, requestPayload)
 		return nil, err
 	}
 
@@ -475,10 +488,10 @@ func sendApiPostRequest(laceworkUrl string, api string, accessToken string, requ
 }
 
 func sendApiDeleteRequest(laceworkUrl string, api string, accessToken string, subAccountName string) (*http.Response, error) {
-	request, err := http.NewRequest(http.MethodDelete, "https://" + laceworkUrl + api, nil)
+	request, err := http.NewRequest(http.MethodDelete, "https://"+laceworkUrl+api, nil)
 
 	if err != nil {
-		LogE.Printf("Error creating API delete request: %v\n",err)
+		LogE.Printf("Error creating API delete request: %v\n", err)
 		return nil, err
 	}
 
@@ -502,17 +515,17 @@ func sendHoneycombEvent(account string, event string, subAccountName string, eve
 	if eventData == "" {
 		eventData = "{}"
 	}
-	requestPayload := HoneycombRequestPayload {
-		Account: account,
-		SubAccount: subAccountName,
-		TechPartner: "AWS",
+	requestPayload := HoneycombRequestPayload{
+		Account:         account,
+		SubAccount:      subAccountName,
+		TechPartner:     "AWS",
 		IntegrationName: "lacework-aws-security-hub-cloudformation",
-		Version: "$BUILD",
-		Service: "AWS Security Hub",
-		InstallMethod: "cloudformation",
-		Function: "setup",
-		Event: event,
-		EventData: eventData,
+		Version:         "$BUILD",
+		Service:         "AWS Security Hub",
+		InstallMethod:   "cloudformation",
+		Function:        "setup",
+		Event:           event,
+		EventData:       eventData,
 	}
 	if payloadBytes, err := json.Marshal(requestPayload); err == nil {
 		if request, err := http.NewRequest(http.MethodPost, "https://api.honeycomb.io/1/events/$DATASET", bytes.NewBuffer(payloadBytes)); err == nil {
@@ -526,4 +539,3 @@ func sendHoneycombEvent(account string, event string, subAccountName string, eve
 		}
 	}
 }
-
