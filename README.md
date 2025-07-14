@@ -1,4 +1,7 @@
-# Lacework AWS Security Hub Integration CloudFormation Deployment
+# Lacework FortiCNAPP AWS Security Hub Integration CloudFormation Deployment
+
+![Fortinet-logo-rgb-black-red](https://github.com/user-attachments/assets/36263258-166e-42b4-a5e4-e6edc6dc3fa0)
+
 
 ## Overview
 With Lacework AWS Security Hub integration, you can send Lacework Security Alerts to AWS Security Hub. This repo contains the CloudFormation template to automatically enable this feature.
