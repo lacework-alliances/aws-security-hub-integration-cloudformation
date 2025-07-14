@@ -272,7 +272,7 @@ Resources:
     Type: AWS::Events::EventBusPolicy
     Properties:
       EventBusName: !Ref LaceworkSecurityHubEventBus
-      StatementId: "LaceworkSecurityHubEventBusStatement"
+      StatementId: !Join ['', [!Ref ResourcePrefixName, '-Event-Bus-Statement']]
       Statement:
         Effect: "Allow"
         Principal:
