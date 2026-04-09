@@ -1,3 +1,12 @@
+# This repo is archived. Please use FortiCNAPP console to access the FortiCNAPP AWS Security Hub Outbound integration CloudFormation template:
+
+1. Log in to the FortiCNAPP console.
+2. Go to Settings > Integrations > Cloud accounts.
+3. Click + Add New.
+4. Click Amazon Web Services and select CloudFormation.
+Click Next.
+Select Security Hub (Outbound) and click Run CloudFormation Template. If you are already logged in to your AWS account, this redirects you to the Create stack page. The template populates the Amazon S3 template URL for you.
+
 # Lacework FortiCNAPP AWS Security Hub Integration CloudFormation Deployment
 
 ![Fortinet-logo-rgb-black-red](https://github.com/user-attachments/assets/36263258-166e-42b4-a5e4-e6edc6dc3fa0)
@@ -25,7 +34,7 @@ You need the following prerequisites to implement the Lacework AWS Security Hub 
 ### 2. Deploy the Lacework AWS Security Hub Integration with CloudFormation
 1. Login in to AWS master account with Administrator permissions.
 Click on the following Launch Stack button to go to your CloudFormation console and launch the AWS Control Integration template.
-   
+
    [![Launch Stack](https://user-images.githubusercontent.com/6440106/150169828-1692c426-ce7a-4ee9-ae6e-0a0b2d9a99e8.png)](https://console.aws.amazon.com/cloudformation/home?#/stacks/create/review?templateURL=https://lacework-alliances.s3.us-west-2.amazonaws.com/lacework-aws-security-hub/templates/aws-security-hub-integration.yml)
 
    For most deployments, you only need the Basic Configuration parameters. Use the Advanced Configuration for customization.
